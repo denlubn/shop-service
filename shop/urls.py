@@ -1,10 +1,15 @@
-from django.urls import path
+from rest_framework import routers
+from django.urls import path, include
 
-from shop.views import ProductListView, order_create_view, order_with_jquery
+from shop.views import CategoryViewSet, ProductViewSet, OrderViewSet
+
+router = routers.DefaultRouter()
+router.register("categories", CategoryViewSet)
+router.register("products", ProductViewSet)
+router.register("orders", OrderViewSet)
 
 urlpatterns = [
-    path("products/", ProductListView.as_view(), name="product-list"),
-    path("products/<int:pk>/order/", order_create_view, name="order-create"),
-    path("products/<int:pk>/order-with-jquery/", order_with_jquery, name="order-with-jquery"),
+    path("", include(router.urls))
 ]
+
 app_name = "shop"

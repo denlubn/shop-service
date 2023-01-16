@@ -11,16 +11,13 @@ class ProductAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ("username", "email", "product_name", "product_category", "product_price")
+    list_display = ("created_at", "username", "email")
 
-    def product_name(self, obj):
-        return obj.product.name
+    def username(self, obj):
+        return obj.user.username
 
-    def product_category(self, obj):
-        return obj.product.category
-
-    def product_price(self, obj):
-        return obj.product.price
+    def email(self, obj):
+        return obj.user.email
 
 
 admin.site.register(Category)

@@ -1,78 +1,60 @@
-from django.http import HttpResponseRedirect
-from django.shortcuts import render, redirect
-from django.urls import reverse_lazy, reverse
-from django.views import generic
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework import viewsets, filters
+from rest_framework.authentication import TokenAuthentication
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.permissions import IsAuthenticated
 
-from shop.forms import ProductSearchForm, OrderForm
-from shop.models import Product, Order
+from shop.models import Product, Order, Category
+from shop.serializers import (
+    CategorySerializer,
+    ProductSerializer,
+    OrderSerializer,
+    ProductListSerializer,
+    OrderListSerializer,
+)
 
 
-class ProductListView(generic.ListView):
-    model = Product
+class CategoryViewSet(viewsets.ModelViewSet):
+    queryset = Category.objects.all()
+    serializer_class = CategorySerializer
+
+
+class Pagination(PageNumberPagination):
+    page_size = 2
+    page_query_param = "page_size"
+    max_page_size = 50
+
+
+class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all()
+    serializer_class = ProductSerializer
+    pagination_class = Pagination
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend]
+    filterset_fields = ["category"]
+    search_fields = ["name"]
 
-    def get_context_data(self, *, object_list=None, **kwargs):
-        context = super(ProductListView, self).get_context_data(**kwargs)
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return ProductListSerializer
 
-        category = self.request.GET.get("category", "")
+        return ProductSerializer
 
-        context["search_form"] = ProductSearchForm(initial={
-            "category": category
-        })
 
-        return context
+class OrderViewSet(viewsets.ModelViewSet):
+    queryset = Order.objects.all()
+    serializer_class = OrderSerializer
+    pagination_class = Pagination
+    authentication_classes = (TokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
 
     def get_queryset(self):
-        category = self.request.GET.get("category", "")
+        return Order.objects.filter(user=self.request.user)
 
-        if category:
-            return self.queryset.filter(category__name__icontains=category)
+    def get_serializer_class(self):
+        if self.action in ["list", "retrieve"]:
+            return OrderListSerializer
 
-        return self.queryset
+        return OrderSerializer
 
-
-def order_create_view(request, pk):
-    if request.method == "GET":
-        context = {
-            "form": OrderForm()
-        }
-        return render(request, "shop/order_form.html", context=context)
-
-    elif request.method == "POST":
-        form = OrderForm(request.POST)
-
-        if form.is_valid():
-            Order.objects.create(**form.cleaned_data, product_id=pk)
-            return HttpResponseRedirect(reverse("shop:product-list"))
-
-        context = {
-            "form": form
-        }
-
-        return render(request, "shop/order_form.html", context=context)
-
-
-def order_with_jquery(request, pk):
-    if request.method == "GET":
-        context = {
-            "order_id": pk
-        }
-        return render(request, "shop/order_jquery.html", context=context)
-
-    if request.method == "POST":
-        username = request.POST.get("username", "")
-        email = request.POST.get("email", "")
-
-        if username and email:
-            Order.objects.create(
-                username=username,
-                email=email,
-                product_id=pk,
-            )
-            return HttpResponseRedirect(reverse("shop:product-list"))
-
-        context = {
-            "error": "Please, provide username & email!"
-        }
-
-        return render(request, "shop/order_jquery.html", context=context)
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
